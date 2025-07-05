@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#2563eb" /> <!-- Colore della barra di stato del browser -->
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png" /> <!-- Icona per iOS -->
+    <link rel="manifest" href="/manifest.json" /> <!-- Link al manifest PWA -->
+    <title>Materiali Furgone</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- JsBarcode CDN per generare codici a barre -->
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <!-- jsPDF CDN per generare PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        /* Stili aggiuntivi se necessari, ma Tailwind dovrebbe bastare */
+        body {
+            font-family: 'Inter', sans-serif; /* Utilizzo del font Inter */
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+
+    <!-- Schermata Principale -->
+    <div id="mainScreen" class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md text-center border border-gray-200">
+        <!-- Sezione Logo -->
+        <div class="mb-4">
+            <img
+                src="https://github.com/brisicche78/materiali-furgone/blob/main/ducatotpc.png?raw=true"
+                alt="Logo Furgone Ducato"
+                class="mx-auto rounded-full shadow-md border-4 border-blue-200 w-28 h-28 object-contain"
+                onerror="this.onerror=null; this.src='https://placehold.co/112x112/cccccc/333333?text=Logo+Non+Disp.'"
+            />
+        </div>
+
+        <h1 class="text-4xl font-extrabold text-gray-800 mb-6 tracking-tight">
+            Furgone
+        </h1>
+        <p class="text-lg text-gray-600 mb-8">
+            Il tuo magazzino mobile a portata di mano.
+        </p>
+
+        <div class="mb-6">
+            <label for="barcode" class="block text-left text-gray-700 text-sm font-semibold mb-2">
+                Inserisci o scansiona il Codice a Barre:
+            </label>
+            <input
+                type="text"
+                id="barcode"
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-lg text-gray-800 placeholder-gray-400 transition duration-200 ease-in-out"
+                placeholder="Es. 1234567890"
+                aria-label="Codice a barre"
+            />
+        </div>
+
+        <!-- Area di selezione quantità dinamica (inizialmente nascosta) -->
+        <div id="dynamicWithdrawalArea" class="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200 text-left hidden">
+            <p class="text-gray-700 font-semibold mb-2">
+                Materiale: <span id="dynamicMaterialName" class="font-normal"></span>
+            </p>
+            <p class="text-gray-700 font-semibold mb-4">
+                Quantità disponibile: <span id="dynamicMaterialQuantity" class="font-normal"></span>
+            </p>
+            <label for="withdrawQuantitySelect" class="block text-sm font-semibold mb-2">
+                Seleziona quantità da prelevare:
+            </label>
+            <select id="withdrawQuantitySelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 mb-4">
+                <!-- Opzioni generate da JavaScript -->
+            </select>
+            <div class="flex flex-col space-y-2">
+                <button
+                    id="confirmWithdrawalButton"
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transform transition duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
+                >
+                    Conferma Prelievo
+                </button>
+                <button
+                    id="cancelWithdrawalButton"
+                    class="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transform transition duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-50"
+                >
+                    Annulla
+                </button>
+            </div>
+        </div>
+
+        <!-- Sezione Pulsanti Principali -->
+        <div class="flex flex-col space-y-4 mt-6"> <!-- Aggiunto mt-6 per spazio sopra i pulsanti -->
+            <button
+                id="withdrawButton"
+                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transform transition duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
+            >
+                Preleva Materiale
+            </button>
+            <button
+                id="insertButton"
+                class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transform transition duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50"
+            >
+                Inserisci Materiale Nuovo
+            </button>
+            <button
+                id="viewMaterialsButton"
+                class="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transform transition duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-opacity-50"
+            >
+                Visualizza Materiali
+            </button>
+            <button
+                id="viewReorderListButton"
+                class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transform transition duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-50"
+            >
+                Visualizza Materiali da Reintegrare
+            </button>
+            <button
+                id="viewWithdrawalHistoryButton"
+                class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transform transition duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50"
+            >
+                Visualizza Storia Prelievi
+            </button>
+        </div>
+
+        <!-- Visualizzazione Messaggio Personalizzato -->
+        <div id="messageDisplay" class="mt-4 p-3 bg-blue-100 text-blue-800 rounded-lg text-sm hidden">
+            <!-- Il messaggio verrà inserito qui dal JavaScript -->
+        </div>
+
+    </div>
+
+    <!-- Schermata Materiali Presenti -->
+    <div id="materialsScreen" class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md text-center border border-gray-200 hidden">
+        <h2 class="text-3xl font-extrabold text-gray-800 mb-6 tracking-tight">
+            Materiali Presenti
+        </h2>
+        <div class="text-left text-gray-700 mb-8 max-h-80 overflow-y-auto"> <!-- Aggiunto max-h e overflow per lo scroll -->
+            <ul id="materialsList" class="list-disc pl-5 space-y-2">
+                <!-- I materiali verranno inseriti qui dal JavaScript -->
+            </ul>
+        </div>
+        <button
+            id="backFromMaterialsButton"
+            class="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transform transition duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50"
+        >
+            Torna Indietro
+        </button>
+    </div>
+
+    <!-- Schermata Inserisci Materiale -->
+    <div id="insertMaterialScreen" class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md text-center border border-gray-200 hidden">
+        <h2 class="text-3xl font-extrabold text-gray-800 mb-6 tracking-tight">
+            Inserisci Nuovo Materiale
+        </h2>
+        <div class="text-left text-gray-700 mb-6 space-y-4">
+            <div>
+                <label for="newBarcode" class="block text-sm font-semibold mb-2">Codice a Barre:</label>
+                <input type="text" id="newBarcode" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" placeholder="Codice a Barre">
+                <button
+                    id="clearNewBarcodeButton"
+                    class="mt-2 w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transform transition duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-opacity-50"
+                >
+                    Cancella Codice a Barre
+                </button>
+            </div>
+            <div>
+                <label for="materialName" class="block text-sm font-semibold mb-2">Nome Materiale:</label>
+                <input type="text" id="materialName" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" placeholder="Nome Materiale">
+            </div>
+            <div>
+                <label for="materialQuantity" class="block text-sm font-semibold mb-2">Quantità:</label>
+                <input type="number" id="materialQuantity" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" placeholder="Quantità" min="0">
+            </div>
+        </div>
+        <div class="flex flex-col space-y-4">
+            <button
+                id="saveMaterialButton"
+                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transform transition duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
+            >
+                Salva Materiale
+            </button>
+            <button
+                id="backFromInsertButton"
+                class="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transform transition duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50"
+            >
+                Torna Indietro
+            </button>
+        </div>
+    </div>
+
+    <!-- Schermata Materiali da Reintegrare -->
+    <div id="reorderReportScreen" class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md text-center border border-gray-200 hidden">
+        <h2 class="text-3xl font-extrabold text-gray-800 mb-6 tracking-tight">
+            Materiali da Reintegrare
+        </h2>
+        <div class="text-left text-gray-700 mb-8 max-h-80 overflow-y-auto">
+            <ul id="reorderMaterialsList" class="list-disc pl-5 space-y-2">
+                <!-- I materiali da reintegrare verranno inseriti qui dal JavaScript -->
+            </ul>
+        </div>
+        <div class="flex flex-col space-y-4">
+            <button
+                id="generatePdfButton"
+                class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transform transition duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50"
+            >
+                Genera Report PDF
+            </button>
+            <button
+                id="backFromReorderButton"
+                class="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transform transition duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50"
+            >
+                Torna Indietro
+            </button>
+        </div>
+    </div>
+
+    <!-- Nuova Schermata Storia Prelievi (inizialmente nascosta) -->
+    <div id="withdrawalHistoryScreen" class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md text-center border border-gray-200 hidden">
+        <h2 class="text-3xl font-extrabold text-gray-800 mb-6 tracking-tight">
+            Storia Prelievi
+        </h2>
+        <div class="text-left text-gray-700 mb-8 max-h-80 overflow-y-auto">
+            <ul id="withdrawalHistoryList" class="list-none pl-0 space-y-4">
+                <!-- I prelievi verranno inseriti qui dal JavaScript -->
+            </ul>
+        </div>
+        <button
+            id="backFromWithdrawalHistoryButton"
+            class="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transform transition duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50"
+        >
+            Torna Indietro
+        </button>
+    </div>
+
+    <script>
+        // Riferimenti alle schermate
+        const mainScreen = document.getElementById('mainScreen');
+        const materialsScreen = document.getElementById('materialsScreen');
+        const insertMaterialScreen = document.getElementById('insertMaterialScreen');
+        const reorderReportScreen = document.getElementById('reorderReportScreen');
+        const withdrawalHistoryScreen = document.getElementById('withdrawalHistoryScreen'); // Nuova schermata
+        
+        const materialsList = document.getElementById('materialsList');
+        const reorderMaterialsList = document.getElementById('reorderMaterialsList');
+        const withdrawalHistoryList = document.getElementById('withdrawalHistoryList'); // Nuova lista
+
+        // Riferimenti agli elementi dell'area di prelievo dinamica
+        const dynamicWithdrawalArea = document.getElementById('dynamicWithdrawalArea');
+        const dynamicMaterialName = document.getElementById('dynamicMaterialName');
+        const dynamicMaterialQuantity = document.getElementById('dynamicMaterialQuantity');
+        const withdrawQuantitySelect = document.getElementById('withdrawQuantitySelect');
+        const confirmWithdrawalButton = document.getElementById('confirmWithdrawalButton');
+        const cancelWithdrawalButton = document.getElementById('cancelWithdrawalButton');
+        const barcodeInputMain = document.getElementById('barcode'); // Riferimento all'input barcode principale
+
+        // Array per memorizzare i materiali e la storia dei prelievi
+        let materials = [];
+        let withdrawalHistory = []; // Nuovo array per la storia dei prelievi
+        let currentMaterialIndex = -1; // Per tenere traccia del materiale selezionato per il prelievo
+
+        // Funzione per caricare i materiali da localStorage
+        function loadMaterials() {
+            const storedMaterials = localStorage.getItem('furgoneMaterials');
+            if (storedMaterials) {
+                materials = JSON.parse(storedMaterials);
+            }
+        }
+
+        // Funzione per salvare i materiali in localStorage
+        function saveMaterials() {
+            localStorage.setItem('furgoneMaterials', JSON.stringify(materials));
+        }
+
+        // Funzione per caricare la storia dei prelievi da localStorage
+        function loadWithdrawalHistory() {
+            const storedHistory = localStorage.getItem('furgoneWithdrawalHistory');
+            if (storedHistory) {
+                withdrawalHistory = JSON.parse(storedHistory);
+            }
+        }
+
+        // Funzione per salvare la storia dei prelievi in localStorage
+        function saveWithdrawalHistory() {
+            localStorage.setItem('furgoneWithdrawalHistory', JSON.stringify(withdrawalHistory));
+        }
+
+        // Funzione per mostrare un messaggio personalizzato
+        function showMessage(msg) {
+            const messageDisplay = document.getElementById('messageDisplay');
+            messageDisplay.textContent = msg;
+            messageDisplay.classList.remove('hidden'); // Rende visibile il div del messaggio
+            setTimeout(() => {
+                messageDisplay.classList.add('hidden'); // Nasconde il div dopo 3 secondi
+            }, 3000);
+        }
+
+        // Funzione per renderizzare la lista dei materiali presenti
+        function renderMaterialsList() {
+            materialsList.innerHTML = ''; // Pulisce la lista esistente
+            if (materials.length === 0) {
+                const li = document.createElement('li');
+                li.textContent = 'Nessun materiale presente.';
+                materialsList.appendChild(li);
+                return;
+            }
+            materials.forEach(material => {
+                const li = document.createElement('li');
+                li.textContent = `${material.name} (Codice: ${material.barcode}) - Qty: ${material.quantity}`;
+                materialsList.appendChild(li);
+            });
+        }
+
+        // Funzione per renderizzare la lista dei materiali da reintegrare
+        function renderReorderList() {
+            reorderMaterialsList.innerHTML = ''; // Pulisce la lista esistente
+            const materialsToReorder = materials.filter(material => material.quantity === 0);
+
+            if (materialsToReorder.length === 0) {
+                const li = document.createElement('li');
+                li.textContent = 'Nessun materiale da reintegrare.';
+                reorderMaterialsList.appendChild(li);
+                return;
+            }
+
+            materialsToReorder.forEach(material => {
+                const li = document.createElement('li');
+                li.textContent = `${material.name} (Codice: ${material.barcode})`;
+                reorderMaterialsList.appendChild(li);
+            });
+        }
+
+        // Funzione per renderizzare la storia dei prelievi
+        function renderWithdrawalHistoryList() {
+            withdrawalHistoryList.innerHTML = ''; // Pulisce la lista esistente
+            if (withdrawalHistory.length === 0) {
+                const li = document.createElement('li');
+                li.textContent = 'Nessun prelievo registrato.';
+                withdrawalHistoryList.appendChild(li);
+                return;
+            }
+
+            // Ordina la storia dal più recente al più vecchio
+            const sortedHistory = [...withdrawalHistory].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+            sortedHistory.forEach((record, index) => {
+                const li = document.createElement('li');
+                li.className = 'bg-gray-100 p-3 rounded-lg shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0';
+                
+                const date = new Date(record.timestamp);
+                const dateStr = date.toLocaleDateString('it-IT');
+                const timeStr = date.toLocaleTimeString('it-IT');
+
+                li.innerHTML = `
+                    <div class="text-sm">
+                        <span class="font-semibold">${record.materialName}</span> - Qty: ${record.quantity}
+                        <br>
+                        <span class="text-gray-500">${dateStr} ${timeStr}</span>
+                    </div>
+                    <button data-index="${index}" class="generate-withdrawal-pdf-btn bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg shadow-md text-sm transition duration-300 ease-in-out">
+                        Genera PDF
+                    </button>
+                `;
+                withdrawalHistoryList.appendChild(li);
+            });
+
+            // Aggiungi event listener ai nuovi pulsanti "Genera PDF"
+            document.querySelectorAll('.generate-withdrawal-pdf-btn').forEach(button => {
+                button.addEventListener('click', (event) => {
+                    const index = event.target.dataset.index;
+                    // Usa l'indice per recuperare il record originale dall'array non ordinato
+                    // o meglio, recupera il record dall'array ordinato se l'indice si riferisce a quello
+                    // Per semplicità, useremo l'indice dell'array ordinato per recuperare l'elemento
+                    generateWithdrawalPdfReport(sortedHistory[index]);
+                });
+            });
+        }
+
+
+        // Funzione per generare il report PDF dei materiali da reintegrare
+        async function generatePdfReport() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            let yOffset = 10; // Offset verticale per il testo e le immagini
+
+            doc.setFontSize(18);
+            doc.text("Report Materiali da Reintegrare", 10, yOffset);
+            yOffset += 10;
+
+            const materialsToReorder = materials.filter(material => material.quantity === 0);
+
+            if (materialsToReorder.length === 0) {
+                doc.setFontSize(12);
+                doc.text("Nessun materiale da reintegrare.", 10, yOffset);
+                doc.save("report_materiali_reintegrare.pdf");
+                return;
+            }
+
+            doc.setFontSize(12);
+            for (const material of materialsToReorder) {
+                yOffset += 10; // Spazio per il nome del materiale
+                doc.text(`Nome: ${material.name}`, 10, yOffset);
+                yOffset += 5; // Spazio tra nome e codice a barre
+
+                // Determina il formato del codice a barre in base alla lunghezza
+                let barcodeFormat = "CODE128"; // Default
+                if (material.barcode.length === 7 && /^\d+$/.test(material.barcode)) {
+                    barcodeFormat = "EAN8";
+                } else if (material.barcode.length === 12 && /^\d+$/.test(material.barcode)) {
+                    barcodeFormat = "EAN13";
+                }
+
+                // Crea un elemento canvas temporaneo per disegnare il codice a barre
+                const canvas = document.createElement('canvas');
+                try {
+                    JsBarcode(canvas, material.barcode, {
+                        format: barcodeFormat, // Usa il formato determinato dinamicamente
+                        displayValue: true,
+                        width: 2,
+                        height: 50,
+                        margin: 5
+                    });
+                    const imgData = canvas.toDataURL('image/png');
+                    // Aggiungi l'immagine del codice a barre al PDF
+                    doc.addImage(imgData, 'PNG', 10, yOffset, 100, 25); // x, y, width, height
+                    yOffset += 30; // Spazio dopo il codice a barre
+                } catch (e) {
+                    console.error("Errore nella generazione del codice a barre per:", material.barcode, e);
+                    doc.text(`Codice a Barre: ${material.barcode} (errore generazione - formato: ${barcodeFormat})`, 10, yOffset);
+                    yOffset += 10;
+                }
+
+                // Aggiungi una nuova pagina se lo spazio sta per finire
+                if (yOffset > 280) { // Circa la fine di una pagina A4
+                    doc.addPage();
+                    yOffset = 10;
+                    doc.setFontSize(18);
+                    doc.text("Report Materiali da Reintegrare (continua)", 10, yOffset);
+                    yOffset += 10;
+                    doc.setFontSize(12);
+                }
+            }
+
+            doc.save("report_materiali_reintegrare.pdf");
+            showMessage("Report PDF generato con successo!");
+        }
+
+        // Funzione per generare il report PDF di un singolo prelievo (ora prende un record dalla storia)
+        async function generateWithdrawalPdfReport(withdrawalRecord) {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            let yOffset = 10;
+
+            const date = new Date(withdrawalRecord.timestamp);
+            const dateStr = date.toLocaleDateString('it-IT');
+            const timeStr = date.toLocaleTimeString('it-IT');
+            // Crea un nome file unico e descrittivo
+            const filename = `Prelievo_${withdrawalRecord.materialName.replace(/\s/g, '_')}_${date.getFullYear()}${(date.getMonth()+1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}_${date.getHours().toString().padStart(2, '0')}${date.getMinutes().toString().padStart(2, '0')}${date.getSeconds().toString().padStart(2, '0')}.pdf`;
+
+            doc.setFontSize(18);
+            doc.text("Report Prelievo Materiale", 10, yOffset);
+            yOffset += 10;
+
+            doc.setFontSize(12);
+            doc.text(`Data: ${dateStr} Ora: ${timeStr}`, 10, yOffset);
+            yOffset += 10;
+
+            doc.text(`Materiale: ${withdrawalRecord.materialName}`, 10, yOffset);
+            yOffset += 7;
+            doc.text(`Codice a Barre: ${withdrawalRecord.materialBarcode}`, 10, yOffset);
+            yOffset += 7;
+            doc.text(`Quantità Prelevata: ${withdrawalRecord.quantity}`, 10, yOffset);
+            yOffset += 7;
+            // Nota: la quantità rimanente qui non è più accurata se il report viene generato dopo altri prelievi
+            // Se vuoi la quantità rimanente al momento del prelievo, dovresti salvarla nel record della storia.
+            // Per ora la ometto o la rendo opzionale.
+            // doc.text(`Quantità Rimanente (al momento del prelievo): ${withdrawalRecord.remainingQuantity}`, 10, yOffset);
+            yOffset += 10;
+
+            // Determina il formato del codice a barre in base alla lunghezza
+            let barcodeFormat = "CODE128"; // Default
+            if (withdrawalRecord.materialBarcode.length === 7 && /^\d+$/.test(withdrawalRecord.materialBarcode)) {
+                barcodeFormat = "EAN8";
+            } else if (withdrawalRecord.materialBarcode.length === 12 && /^\d+$/.test(withdrawalRecord.materialBarcode)) {
+                barcodeFormat = "EAN13";
+            }
+
+            // Crea un elemento canvas temporaneo per disegnare il codice a barre
+            const canvas = document.createElement('canvas');
+            try {
+                JsBarcode(canvas, withdrawalRecord.materialBarcode, {
+                    format: barcodeFormat, // Usa il formato determinato dinamicamente
+                    displayValue: true,
+                    width: 2,
+                    height: 50,
+                    margin: 5
+                });
+                const imgData = canvas.toDataURL('image/png');
+                // Aggiungi l'immagine del codice a barre al PDF
+                doc.addImage(imgData, 'PNG', 10, yOffset, 100, 25); // x, y, width, height
+                yOffset += 30;
+            } catch (e) {
+                console.error("Errore nella generazione del codice a barre per il report di prelievo:", withdrawalRecord.materialBarcode, e);
+                doc.text(`Codice a Barre: ${withdrawalRecord.materialBarcode} (errore generazione - formato: ${barcodeFormat})`, 10, yOffset);
+                yOffset += 10;
+            }
+
+            doc.save(filename);
+            showMessage("Report Prelievo PDF generato con successo!");
+        }
+
+
+        // Gestore per il pulsante "Preleva Materiale" (iniziale)
+        document.getElementById('withdrawButton').addEventListener('click', () => {
+            const barcodeValue = barcodeInputMain.value.trim();
+
+            if (barcodeValue === '') {
+                showMessage('Per favore, inserisci un codice a barre.');
+                return;
+            }
+
+            currentMaterialIndex = materials.findIndex(m => m.barcode === barcodeValue);
+
+            if (currentMaterialIndex !== -1) {
+                const material = materials[currentMaterialIndex];
+                if (material.quantity > 1) {
+                    // Popola il dropdown e mostra l'area di selezione
+                    dynamicMaterialName.textContent = material.name;
+                    dynamicMaterialQuantity.textContent = material.quantity;
+                    withdrawQuantitySelect.innerHTML = ''; // Pulisce le opzioni precedenti
+                    const maxWithdraw = Math.min(material.quantity, 10); // Max 10 o quantità disponibile
+                    for (let i = 1; i <= maxWithdraw; i++) {
+                        const option = document.createElement('option');
+                        option.value = i;
+                        option.textContent = i;
+                        withdrawQuantitySelect.appendChild(option);
+                    }
+                    dynamicWithdrawalArea.classList.remove('hidden');
+                    // Nascondi i pulsanti principali per evitare confusione
+                    document.querySelector('.flex.flex-col.space-y-4').classList.add('hidden');
+                } else if (material.quantity === 1) {
+                    // Preleva direttamente se la quantità è 1
+                    material.quantity--;
+                    saveMaterials();
+                    showMessage(`Materiale "${material.name}" prelevato. Quantità rimanente: ${material.quantity}`);
+                    if (material.quantity === 0) {
+                        showMessage(`ATTENZIONE: Il materiale "${material.name}" è TERMINATO!`);
+                    }
+                    // Aggiungi il prelievo alla storia
+                    withdrawalHistory.push({
+                        materialBarcode: material.barcode,
+                        materialName: material.name,
+                        quantity: 1, // Quantità prelevata
+                        timestamp: new Date().toISOString()
+                    });
+                    saveWithdrawalHistory(); // Salva la storia aggiornata
+
+                    barcodeInputMain.value = '';
+                    dynamicWithdrawalArea.classList.add('hidden'); // Assicurati che sia nascosta
+                } else {
+                    showMessage(`Materiale "${material.name}" esaurito.`);
+                    barcodeInputMain.value = '';
+                    dynamicWithdrawalArea.classList.add('hidden');
+                }
+            } else {
+                showMessage(`Materiale con codice a barre "${barcodeValue}" non trovato.`);
+                barcodeInputMain.value = '';
+                dynamicWithdrawalArea.classList.add('hidden');
+            }
+        });
+
+        // Gestore per il pulsante "Conferma Prelievo" (dopo selezione quantità)
+        confirmWithdrawalButton.addEventListener('click', () => {
+            if (currentMaterialIndex === -1) {
+                showMessage('Errore: Nessun materiale selezionato per il prelievo.');
+                return;
+            }
+
+            const quantityToWithdraw = parseInt(withdrawQuantitySelect.value, 10);
+            const material = materials[currentMaterialIndex];
+
+            if (quantityToWithdraw > 0 && quantityToWithdraw <= material.quantity) {
+                material.quantity -= quantityToWithdraw;
+                saveMaterials();
+                showMessage(`Prelevati ${quantityToWithdraw} unità di "${material.name}". Quantità rimanente: ${material.quantity}`);
+                if (material.quantity === 0) {
+                    showMessage(`ATTENZIONE: Il materiale "${material.name}" è TERMINATO!`);
+                }
+                // Aggiungi il prelievo alla storia
+                withdrawalHistory.push({
+                    materialBarcode: material.barcode,
+                    materialName: material.name,
+                    quantity: quantityToWithdraw, // Quantità prelevata
+                    timestamp: new Date().toISOString()
+                });
+                saveWithdrawalHistory(); // Salva la storia aggiornata
+
+            } else {
+                showMessage('Quantità non valida per il prelievo.');
+            }
+
+            // Resetta lo stato e nascondi l'area dinamica
+            barcodeInputMain.value = '';
+            dynamicWithdrawalArea.classList.add('hidden');
+            document.querySelector('.flex.flex-col.space-y-4').classList.remove('hidden'); // Mostra i pulsanti principali
+            currentMaterialIndex = -1; // Resetta l'indice
+        });
+
+        // Gestore per il pulsante "Annulla Prelievo"
+        cancelWithdrawalButton.addEventListener('click', () => {
+            barcodeInputMain.value = '';
+            dynamicWithdrawalArea.classList.add('hidden');
+            document.querySelector('.flex.flex-col.space-y-4').classList.remove('hidden'); // Mostra i pulsanti principali
+            currentMaterialIndex = -1; // Resetta l'indice
+            showMessage('Prelievo annullato.');
+        });
+
+
+        // Gestore per il pulsante "Inserisci Materiale Nuovo"
+        document.getElementById('insertButton').addEventListener('click', () => {
+            mainScreen.classList.add('hidden'); // Nasconde la schermata principale
+            insertMaterialScreen.classList.remove('hidden'); // Mostra la schermata di inserimento
+            barcodeInputMain.value = ''; // Pulisce l'input principale
+            dynamicWithdrawalArea.classList.add('hidden'); // Nascondi l'area dinamica se visibile
+            document.querySelector('.flex.flex-col.space-y-4').classList.remove('hidden'); // Assicurati che i pulsanti principali siano visibili
+        });
+
+        // Gestore per il pulsante "Visualizza Materiali"
+        document.getElementById('viewMaterialsButton').addEventListener('click', () => {
+            renderMaterialsList(); // Aggiorna la lista prima di mostrarla
+            mainScreen.classList.add('hidden'); // Nasconde la schermata principale
+            materialsScreen.classList.remove('hidden'); // Mostra la schermata materiali
+            barcodeInputMain.value = ''; // Pulisce l'input principale
+            dynamicWithdrawalArea.classList.add('hidden'); // Nascondi l'area dinamica se visibile
+            document.querySelector('.flex.flex-col.space-y-4').classList.remove('hidden'); // Assicurati che i pulsanti principali siano visibili
+        });
+
+        // Gestore per il pulsante "Visualizza Materiali da Reintegrare"
+        document.getElementById('viewReorderListButton').addEventListener('click', () => {
+            renderReorderList(); // Aggiorna la lista dei materiali da reintegrare
+            mainScreen.classList.add('hidden'); // Nasconde la schermata principale
+            reorderReportScreen.classList.remove('hidden'); // Mostra la schermata del report
+            barcodeInputMain.value = ''; // Pulisce l'input principale
+            dynamicWithdrawalArea.classList.add('hidden'); // Nascondi l'area dinamica se visibile
+            document.querySelector('.flex.flex-col.space-y-4').classList.remove('hidden'); // Assicurati che i pulsanti principali siano visibili
+        });
+
+        // Gestore per il pulsante "Visualizza Storia Prelievi" (Nuovo pulsante)
+        document.getElementById('viewWithdrawalHistoryButton').addEventListener('click', () => {
+            renderWithdrawalHistoryList(); // Aggiorna la lista della storia dei prelievi
+            mainScreen.classList.add('hidden'); // Nasconde la schermata principale
+            withdrawalHistoryScreen.classList.remove('hidden'); // Mostra la schermata della storia
+            barcodeInputMain.value = ''; // Pulisce l'input principale
+            dynamicWithdrawalArea.classList.add('hidden'); // Nascondi l'area dinamica se visibile
+            document.querySelector('.flex.flex-col.space-y-4').classList.remove('hidden'); // Assicurati che i pulsanti principali siano visibili
+        });
+
+        // Gestore per il pulsante "Torna Indietro" nella schermata materiali
+        document.getElementById('backFromMaterialsButton').addEventListener('click', () => {
+            materialsScreen.classList.add('hidden'); // Nasconde la schermata materiali
+            mainScreen.classList.remove('hidden'); // Mostra la schermata principale
+        });
+
+        // Gestore per il pulsante "Torna Indietro" nella schermata materiali da reintegrare
+        document.getElementById('backFromReorderButton').addEventListener('click', () => {
+            reorderReportScreen.classList.add('hidden'); // Nasconde la schermata del report
+            mainScreen.classList.remove('hidden'); // Mostra la schermata principale
+        });
+
+        // Gestore per il pulsante "Torna Indietro" nella schermata storia prelievi (Nuovo)
+        document.getElementById('backFromWithdrawalHistoryButton').addEventListener('click', () => {
+            withdrawalHistoryScreen.classList.add('hidden'); // Nasconde la schermata della storia
+            mainScreen.classList.remove('hidden'); // Mostra la schermata principale
+        });
+
+        // Gestore per il pulsante "Salva Materiale" nella schermata di inserimento
+        document.getElementById('saveMaterialButton').addEventListener('click', () => {
+            const newBarcodeInput = document.getElementById('newBarcode');
+            const materialNameInput = document.getElementById('materialName');
+            const materialQuantityInput = document.getElementById('materialQuantity');
+
+            const newBarcode = newBarcodeInput.value.trim();
+            const materialName = materialNameInput.value.trim();
+            const materialQuantity = parseInt(materialQuantityInput.value, 10);
+
+            if (newBarcode === '' || materialName === '' || isNaN(materialQuantity) || materialQuantity <= 0) {
+                showMessage('Per favore, compila tutti i campi correttamente (quantità > 0).');
+                return;
+            }
+
+            const existingMaterial = materials.find(m => m.barcode === newBarcode);
+            if (existingMaterial) {
+                showMessage('Errore: Codice a barre già esistente. Se vuoi aggiornare la quantità, preleva il materiale e poi reinseriscilo con la nuova quantità totale.');
+                return;
+            }
+
+            const newMaterial = {
+                barcode: newBarcode,
+                name: materialName,
+                quantity: materialQuantity
+            };
+            materials.push(newMaterial);
+            saveMaterials();
+
+            // Aggiungi una nota per l'utente sui formati EAN
+            let barcodeTypeNote = '';
+            if (newBarcode.length === 7 && /^\d+$/.test(newBarcode)) {
+                barcodeTypeNote = ' (sarà generato come EAN-8 nel report PDF)';
+            } else if (newBarcode.length === 12 && /^\d+$/.test(newBarcode)) {
+                barcodeTypeNote = ' (sarà generato come EAN-13 nel report PDF)';
+            } else {
+                barcodeTypeNote = ' (sarà generato come CODE128 nel report PDF)';
+            }
+
+            showMessage(`Materiale "${materialName}" salvato con successo!${barcodeTypeNote}`);
+
+            newBarcodeInput.value = '';
+            materialNameInput.value = '';
+            materialQuantityInput.value = '';
+        });
+
+        // Gestore per il pulsante "Torna Indietro" nella schermata di inserimento
+        document.getElementById('backFromInsertButton').addEventListener('click', () => {
+            insertMaterialScreen.classList.add('hidden');
+            mainScreen.classList.remove('hidden');
+            document.getElementById('newBarcode').value = '';
+            document.getElementById('materialName').value = '';
+            document.getElementById('materialQuantity').value = '';
+        });
+
+        // Gestore per il pulsante "Cancella Codice a Barre" nella schermata di inserimento
+        document.getElementById('clearNewBarcodeButton').addEventListener('click', () => {
+            document.getElementById('newBarcode').value = '';
+            showMessage('Codice a barre cancellato.');
+        });
+
+        // Gestore per il pulsante "Genera Report PDF" (per materiali da reintegrare)
+        document.getElementById('generatePdfButton').addEventListener('click', generatePdfReport);
+
+        // Registrazione del Service Worker (per funzionalità PWA)
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then(registration => {
+                        console.log('Service Worker registrato con successo:', registration);
+                    })
+                    .catch(error => {
+                        console.log('Registrazione Service Worker fallita:', error);
+                    });
+            });
+        }
+
+        // Carica i materiali e la storia dei prelievi all'avvio dell'applicazione
+        loadMaterials();
+        loadWithdrawalHistory(); // Carica la storia dei prelievi all'avvio
+    </script>
+</body>
+</html>
